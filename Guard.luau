@@ -3,12 +3,11 @@ local Workspace = game:GetService("Workspace")
 local RunService = game:GetService("RunService")
 local Debris = game:GetService("Debris")
 
-local OwnerName = "takipakipayer"
+local localPlayer = Players.LocalPlayer
+local OwnerName = localPlayer and localPlayer.Name or "takipakipayer"
 
 local AggressorList = {}
-local activeGuard = nil
-local activeDrone = nil
-local currentUnitType = "standard"
+local ActiveUnits = {}
 
 local function addAggressor(player)
     if player.Name == OwnerName then return end
@@ -232,7 +231,7 @@ local function spawnJuggernautGuard(ownerCharacter)
     local guard, rootPart, humanoid, torso = buildHumanoidModel("JuggernautGuard", 1.5, Color3.fromRGB(50, 50, 50))
     humanoid.WalkSpeed = 10
     guard.Parent = Workspace
-    rootPart.CFrame = ownerCharacter.PrimaryPart.CFrame * CFrame.new(4, 0, 4)
+    rootPart.CFrame = ownerCharacter.PrimaryPart.CFrame * CFrame.new(-4, 0, 4)
 
     local debounce = false
     local conn
@@ -262,7 +261,7 @@ local function spawnJuggernautGuard(ownerCharacter)
                 task.delay(2.5, function() debounce = false end)
             end
         else
-            humanoid:MoveTo(ownerCharacter.HumanoidRootPart.Position + Vector3.new(6, 0, 6))
+            humanoid:MoveTo(ownerCharacter.HumanoidRootPart.Position + Vector3.new(-6, 0, 6))
         end
     end)
     return guard
@@ -281,7 +280,7 @@ local function spawnJuggernautDrone(ownerCharacter)
     conn = RunService.Heartbeat:Connect(function()
         if not drone.Parent or not ownerCharacter:FindFirstChild("HumanoidRootPart") then conn:Disconnect() return end
         
-        local ownerPos = ownerCharacter.HumanoidRootPart.Position + Vector3.new(0, 8, 0)
+        local ownerPos = ownerCharacter.HumanoidRootPart.Position + Vector3.new(4, 8, -4)
         drone.CFrame = drone.CFrame:Lerp(CFrame.new(ownerPos, ownerCharacter.HumanoidRootPart.Position), 0.05)
 
         local ownerHum = ownerCharacter:FindFirstChild("Humanoid")
@@ -322,7 +321,7 @@ local function spawnEPUGuard(ownerCharacter)
     weld2.Parent = torso
 
     guard.Parent = Workspace
-    rootPart.CFrame = ownerCharacter.PrimaryPart.CFrame * CFrame.new(3, 0, 3)
+    rootPart.CFrame = ownerCharacter.PrimaryPart.CFrame * CFrame.new(0, 0, 6)
 
     local debounce = false
     local conn
@@ -344,7 +343,7 @@ local function spawnEPUGuard(ownerCharacter)
                 task.delay(0.5, function() debounce = false end)
             end
         else
-            humanoid:MoveTo(ownerCharacter.HumanoidRootPart.Position + Vector3.new(4, 0, 4))
+            humanoid:MoveTo(ownerCharacter.HumanoidRootPart.Position + Vector3.new(0, 0, 6))
         end
     end)
     return guard
@@ -386,56 +385,38 @@ local function spawnEPUDrone(ownerCharacter)
                 task.delay(1, function() debounce = false end)
             end
         else
-            local ownerPos = ownerCharacter.HumanoidRootPart.Position + Vector3.new(-4, 10, -4)
+            local ownerPos = ownerCharacter.HumanoidRootPart.Position + Vector3.new(0, 10, -6)
             drone.CFrame = drone.CFrame:Lerp(CFrame.new(ownerPos, ownerCharacter.HumanoidRootPart.Position), 0.1)
         end
     end)
     return drone
 end
 
-local function deployUnit(character)
-    if activeGuard then activeGuard:Destroy() end
-    if activeDrone then activeDrone:Destroy() end
-    
-    if currentUnitType == "standard" then
-        activeGuard = spawnStandardGuard(character)
-        activeDrone = spawnStandardDrone(character)
-    elseif currentUnitType == "juggernaut" then
-        activeGuard = spawnJuggernautGuard(character)
-        activeDrone = spawnJuggernautDrone(character)
-    elseif currentUnitType == "epu" then
-        activeGuard = spawnEPUGuard(character)
-        activeDrone = spawnEPUDrone(character)
+local function deployAllUnits(character)
+    for _, unit in ipairs(ActiveUnits) do
+        if unit then unit:Destroy() end
     end
+    table.clear(ActiveUnits)
+    
+    table.insert(ActiveUnits, spawnStandardGuard(character))
+    table.insert(ActiveUnits, spawnStandardDrone(character))
+    table.insert(ActiveUnits, spawnJuggernautGuard(character))
+    table.insert(ActiveUnits, spawnJuggernautDrone(character))
+    table.insert(ActiveUnits, spawnEPUGuard(character))
+    table.insert(ActiveUnits, spawnEPUDrone(character))
 end
 
 Players.PlayerAdded:Connect(function(player)
-    player.Chatted:Connect(function(msg)
-        if player.Name == OwnerName then
-            local lowerMsg = string.lower(msg)
-            if lowerMsg == "/guard standard" then
-                currentUnitType = "standard"
-                if player.Character then deployUnit(player.Character) end
-            elseif lowerMsg == "/guard juggernaut" then
-                currentUnitType = "juggernaut"
-                if player.Character then deployUnit(player.Character) end
-            elseif lowerMsg == "/guard epu" then
-                currentUnitType = "epu"
-                if player.Character then deployUnit(player.Character) end
-            end
-        end
-    end)
-    
     player.CharacterAdded:Connect(function(character)
         if player.Name == OwnerName then
             task.wait(1)
-            deployUnit(character)
+            deployAllUnits(character)
         end
     end)
 end)
 
 for _, player in ipairs(Players:GetPlayers()) do
     if player.Name == OwnerName and player.Character then
-        deployUnit(player.Character)
+        deployAllUnits(player.Character)
     end
 end
